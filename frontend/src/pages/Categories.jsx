@@ -10,6 +10,8 @@ const Categories = () => {
   const [selectedRole, setSelectedRole] = useState('Software Engineer');
   const [numQuestions, setNumQuestions] = useState(5);
   const [proctoringEnabled, setProctoringEnabled] = useState(false);
+  const [sessionMode, setSessionMode] = useState('normal');
+  const [apiKey, setApiKey] = useState('');
 
   const [categoriesList, setCategoriesList] = useState([
     'Technical',
@@ -157,6 +159,67 @@ const Categories = () => {
                 required
               />
             </div>
+          </div>
+
+                    {/* AI Mode Toggle */}
+          <div className="form-group" style={{ marginBottom: '2rem' }}>
+            <label className="form-label" style={{ fontSize: '1rem', color: '#fff', marginBottom: '0.75rem' }}>
+              Interview Mode
+            </label>
+            <div style={{ display: 'flex', gap: '1rem' }}>
+              <div
+                onClick={() => setSessionMode('normal')}
+                style={{
+                  flex: 1,
+                  padding: '1rem',
+                  borderRadius: '10px',
+                  background: sessionMode === 'normal' ? 'rgba(79, 70, 229, 0.15)' : 'rgba(15, 23, 42, 0.6)',
+                  border: sessionMode === 'normal' ? '1px solid #818cf8' : '1px solid var(--border)',
+                  cursor: 'pointer',
+                  textAlign: 'center',
+                  transition: 'var(--transition)'
+                }}
+              >
+                <h4 style={{ color: sessionMode === 'normal' ? '#fff' : '#94a3b8', marginBottom: '0.25rem', marginTop: 0 }}>Standard Mode</h4>
+                <p style={{ fontSize: '0.8rem', color: '#94a3b8', margin: 0 }}>Pre-programmed questions, standard heuristic evaluation.</p>
+              </div>
+              <div
+                onClick={() => setSessionMode('ai')}
+                style={{
+                  flex: 1,
+                  padding: '1rem',
+                  borderRadius: '10px',
+                  background: sessionMode === 'ai' ? 'rgba(79, 70, 229, 0.15)' : 'rgba(15, 23, 42, 0.6)',
+                  border: sessionMode === 'ai' ? '1px solid #818cf8' : '1px solid var(--border)',
+                  cursor: 'pointer',
+                  textAlign: 'center',
+                  transition: 'var(--transition)'
+                }}
+              >
+                <h4 style={{ color: sessionMode === 'ai' ? '#fff' : '#94a3b8', marginBottom: '0.25rem', marginTop: 0 }}>AI-Powered Mode</h4>
+                <p style={{ fontSize: '0.8rem', color: '#94a3b8', margin: 0 }}>Advanced real-time AI feedback (Requires Gemini API key).</p>
+              </div>
+            </div>
+            
+            {sessionMode === 'ai' && (
+              <div style={{ marginTop: '1.25rem' }}>
+                <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  Your Gemini API Key
+                  <span style={{ fontSize: '0.75rem', color: '#34d399' }}>Stored locally only</span>
+                </label>
+                <input
+                  type="password"
+                  className="form-input"
+                  placeholder="AIzaSy..."
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                  required={sessionMode === 'ai'}
+                />
+                <p style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '0.5rem' }}>
+                  Your key is sent directly to Google from your browser. It is NEVER sent to our backend or stored on our servers.
+                </p>
+              </div>
+            )}
           </div>
 
           {/* AI Proctoring Opt-In Toggle */}

@@ -107,7 +107,7 @@ export const getInterviewById = async (req, res) => {
 // @access  Private
 export const answerQuestion = async (req, res) => {
   try {
-    const { questionId, userAnswer, responseTimeSeconds = 0 } = req.body;
+    const { questionId, userAnswer, responseTimeSeconds = 0, clientFeedback } = req.body;
     const { sessionId } = req.params;
 
     const session = await InterviewSession.findOne({

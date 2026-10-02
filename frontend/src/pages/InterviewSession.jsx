@@ -12,6 +12,8 @@ const InterviewSession = () => {
   const location = useLocation();
 
   const [session, setSession] = useState(location.state?.session || null);
+  const sessionMode = location.state?.sessionMode || 'normal';
+  const apiKey = location.state?.apiKey || '';
   const [currentIndex, setCurrentIndex] = useState(0);
   const [userAnswer, setUserAnswer] = useState('');
   const [responseTimeSeconds, setResponseTimeSeconds] = useState(0);
@@ -173,6 +175,83 @@ const InterviewSession = () => {
     setResponseTimeSeconds(secs);
   };
 
+
+  const callGeminiAPI = async (question, answer, key) => {
+    const prompt = `
+Evaluated Question Details:
+- Category: ${question.category || 'General'}
+- Target Role: ${question.role || 'Software Engineer'}
+- Difficulty: ${question.difficulty || 'Medium'}
+- Question Text: "${question.text}"
+- Ideal Key Points Expected: ${JSON.stringify(question.idealPoints || [])}
+
+Candidate's Submitted Answer:
+"${answer || '(No response provided)'}"
+
+Task:
+Evaluate the candidate's answer thoroughly and fairly based on the question context and ideal points.
+Return a structured JSON evaluation adhering strictly to the response schema. All scores must be integers between 0 and 10.
+`;
+
+    const responseSchema = {
+      type: "OBJECT",
+      properties: {
+        scores: {
+          type: "OBJECT",
+          properties: {
+            relevance: { type: "INTEGER" },
+            clarity: { type: "INTEGER" },
+            confidence: { type: "INTEGER" },
+            communication: { type: "INTEGER" },
+            overall: { type: "INTEGER" }
+          }
+        },
+        strengths: { type: "ARRAY", items: { type: "STRING" } },
+        weaknesses: { type: "ARRAY", items: { type: "STRING" } },
+        suggestions: { type: "ARRAY", items: { type: "STRING" } },
+        improvedAnswerExample: { type: "STRING" }
+      },
+      required: ["scores", "strengths", "weaknesses", "suggestions", "improvedAnswerExample"]
+    };
+
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        systemInstruction: { role: 'system', parts: [{ text: 'You are an expert interview evaluator and career coach. Assess candidate answers for technical depth, clarity, confidence, relevance, and overall communication quality.' }] },
+        generationConfig: {
+          temperature: 0.4,
+          responseMimeType: 'application/json',
+          responseSchema: responseSchema
+        }
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error('Gemini API call failed: ' + response.statusText);
+    }
+    
+    const data = await response.json();
+    const rawOutput = data.candidates[0].content.parts[0].text;
+    const parsed = JSON.parse(rawOutput);
+    
+    return {
+      scores: {
+        relevance: Number(parsed.scores?.relevance || 5),
+        clarity: Number(parsed.scores?.clarity || 5),
+        confidence: Number(parsed.scores?.confidence || 5),
+        communication: Number(parsed.scores?.communication || 5),
+        overall: Number(parsed.scores?.overall || 5),
+      },
+      strengths: Array.isArray(parsed.strengths) ? parsed.strengths : [],
+      weaknesses: Array.isArray(parsed.weaknesses) ? parsed.weaknesses : [],
+      suggestions: Array.isArray(parsed.suggestions) ? parsed.suggestions : [],
+      improvedAnswerExample: parsed.improvedAnswerExample || '',
+      rawModelOutput: rawOutput,
+    };
+  };
+
   const handleSubmitAnswer = async (e) => {
     e.preventDefault();
     if (!userAnswer.trim()) return;
@@ -187,16 +266,27 @@ const InterviewSession = () => {
     setErrorMsg('');
 
     try {
+      let clientFeedback = null;
+      if (sessionMode === 'ai' && apiKey) {
+        try {
+          clientFeedback = await callGeminiAPI(currentQuestion, userAnswer.trim(), apiKey);
+        } catch (aiErr) {
+          console.error('[InterviewSession] Gemini API Error on client:', aiErr);
+          throw new Error('Failed to generate AI feedback with provided key.');
+        }
+      }
+
       const { data: feedback } = await API.post(`/interviews/${sessionId}/answer`, {
         questionId: currentQuestion._id || currentQuestion,
         userAnswer: userAnswer.trim(),
         responseTimeSeconds,
+        clientFeedback
       });
 
       setCurrentFeedback(feedback);
     } catch (err) {
       console.error('[InterviewSession] Error submitting answer:', err);
-      setErrorMsg(err.response?.data?.message || 'Error communicating with AI evaluation service.');
+      setErrorMsg(err.response?.data?.message || err.message || 'Error communicating with evaluation service.');
     } finally {
       setSubmitting(false);
     }
